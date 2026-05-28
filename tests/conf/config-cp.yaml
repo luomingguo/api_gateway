@@ -1,0 +1,41 @@
+# 测试专用控制面配置（精简版）
+apisix:
+  node_listen: 9080
+  enable_admin: true
+  admin_key:
+    - name: admin
+      key: ${{APISIX_ADMIN_KEY}}
+      role: admin
+  admin_listen:
+    ip: 0.0.0.0
+    port: 9180
+  allow_admin:
+    - 0.0.0.0/0   # 测试环境允许所有来源
+
+deployment:
+  role: traditional
+  role_traditional:
+    config_provider: etcd
+  etcd:
+    host:
+      - ${{ETCD_HOSTS}}
+    prefix: ${{ETCD_PREFIX}}
+    timeout: 10
+
+nginx_config:
+  worker_processes: 1
+  http:
+    error_log_level: info
+
+plugins:
+  - key-auth
+  - jwt-auth
+  - limit-req
+  - limit-count
+  - ip-restriction
+  - cors
+  - proxy-rewrite
+  - response-rewrite
+  - prometheus
+  - custom/my-auth-validator
+  - custom/request-id-enhancer

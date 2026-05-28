@@ -1,0 +1,54 @@
+name: Deploy APISIX
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      plugins_changed: ${{ steps.changes.outputs.plugins }}
+      config_changed: ${{ steps.changes.outputs.config }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            plugins:
+              - 'apisix/plugins/**'
+              - 'docker/Dockerfile'
+            config:
+              - 'apisix/adc/**'
+              - 'apisix/apisix.yaml'
+
+  build-and-deploy:
+    needs: check-changes
+    if: needs.check-changes.outputs.plugins_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build custom image
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}/apisix:${{ github.sha }} \
+            -f docker/Dockerfile .
+          docker push ghcr.io/${{ github.repository }}/apisix:${{ github.sha }}
+      - name: Deploy to server
+        run: |
+          ssh deploy@${{ secrets.SERVER_HOST }} \
+            "cd /opt/gateway && IMAGE_TAG=${{ github.sha }} docker compose pull && docker compose up -d"
+
+  sync-config:
+    needs: check-changes
+    if: needs.check-changes.outputs.config_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync routes via ADC
+        run: |
+          # ADC 模式：推送路由到 etcd
+          adc sync --config apisix/adc/ --server ${{ secrets.APISIX_ADMIN_URL }}
+          
+          # 或 Standalone 模式：直接 scp 覆盖文件，APISIX 自动热重载
+          # scp apisix/apisix.yaml deploy@${{ secrets.SERVER_HOST }}:/opt/gateway/apisix/apisix.yaml

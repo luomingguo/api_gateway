@@ -1,0 +1,91 @@
+name: apisix-test
+
+# 完全独立的测试环境，不依赖任何外部服务
+# 由 tests/run-tests.sh 自动管理生命周期
+
+services:
+  # ── 测试专用 etcd ──────────────────────────────────────────
+  test-etcd:
+    image: bitnami/etcd:3.5.16
+    container_name: apisix-test-etcd
+    environment:
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_ADVERTISE_CLIENT_URLS: http://test-etcd:2379
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+    ports:
+      - "${TEST_ETCD_PORT:-12379}:2379"
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=http://localhost:2379", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - test-net
+
+  # ── 测试专用控制面 ─────────────────────────────────────────
+  test-apisix-cp:
+    image: apache/apisix:${APISIX_VERSION:-3.16.0-debian}
+    container_name: apisix-test-cp
+    volumes:
+      - ./conf/config-cp.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ../plugins:/usr/local/apisix/plugins/custom:ro
+    ports:
+      - "${TEST_ADMIN_PORT:-19180}:9180"
+    environment:
+      APISIX_ADMIN_KEY: ${TEST_ADMIN_KEY:-test-admin-key-for-testing-only}
+      ETCD_HOSTS: http://test-etcd:2379
+      ETCD_PREFIX: /apisix-test
+    depends_on:
+      test-etcd:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf",
+             "http://localhost:9180/apisix/admin/routes",
+             "-H", "X-API-KEY: ${TEST_ADMIN_KEY:-test-admin-key-for-testing-only}"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 20s
+    networks:
+      - test-net
+
+  # ── 测试专用数据面 ─────────────────────────────────────────
+  test-apisix-dp:
+    image: apache/apisix:${APISIX_VERSION:-3.16.0-debian}
+    container_name: apisix-test-dp
+    volumes:
+      - ./conf/config-dp.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ../plugins:/usr/local/apisix/plugins/custom:ro
+    ports:
+      - "${TEST_HTTP_PORT:-19080}:9080"
+    environment:
+      CP_ETCD_HOSTS: http://test-etcd:2379
+      ETCD_PREFIX: /apisix-test
+    depends_on:
+      test-apisix-cp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9080/apisix/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+    networks:
+      - test-net
+
+  # ── Mock 上游服务（httpbin）────────────────────────────────
+  mock-upstream:
+    image: kennethreitz/httpbin:latest
+    container_name: apisix-test-upstream
+    networks:
+      - test-net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost/status/200"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+networks:
+  test-net:
+    name: apisix-test-net
+    driver: bridge

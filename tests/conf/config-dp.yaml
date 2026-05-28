@@ -1,0 +1,35 @@
+# 测试专用数据面配置（精简版）
+apisix:
+  node_listen:
+    - port: 9080
+  enable_admin: false
+  ssl:
+    enable: false
+
+deployment:
+  role: data_plane
+  role_data_plane:
+    config_provider: etcd
+  etcd:
+    host:
+      - ${{CP_ETCD_HOSTS}}
+    prefix: ${{ETCD_PREFIX}}
+    timeout: 10
+
+nginx_config:
+  worker_processes: 1
+  http:
+    error_log_level: info
+
+plugins:
+  - key-auth
+  - jwt-auth
+  - limit-req
+  - limit-count
+  - ip-restriction
+  - cors
+  - proxy-rewrite
+  - response-rewrite
+  - prometheus
+  - custom/my-auth-validator
+  - custom/request-id-enhancer

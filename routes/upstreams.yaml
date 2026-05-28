@@ -1,0 +1,44 @@
+# ============================================================
+# 上游服务声明
+# ============================================================
+
+upstreams:
+  - id: "upstream-backend"
+    name: "后端主服务"
+    type: roundrobin
+    scheme: http
+    nodes:
+      "backend-service:8080": 1
+    checks:
+      active:
+        type: http
+        http_path: /health
+        interval: 10
+        timeout: 3
+        unhealthy:
+          http_statuses: [500, 502, 503, 504]
+          interval: 5
+          http_failures: 3
+        healthy:
+          http_statuses: [200]
+          interval: 10
+          successes: 2
+      passive:
+        unhealthy:
+          http_statuses: [500, 502, 503, 504]
+          http_failures: 5
+
+  - id: "upstream-user-service"
+    name: "用户服务"
+    type: roundrobin
+    scheme: http
+    nodes:
+      "user-service-1:8080": 2    # 权重 2
+      "user-service-2:8080": 1    # 权重 1（灰度）
+    timeout:
+      connect: 3
+      send: 5
+      read: 10
+    keepalive: true
+    keepalive_timeout: 60000
+    keepalive_pool: 320

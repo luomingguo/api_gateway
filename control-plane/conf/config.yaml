@@ -1,0 +1,115 @@
+# ============================================================
+# 控制面 APISIX 配置
+# 使用 ${{VAR}} 语法从容器环境变量读取敏感配置
+# ============================================================
+
+apisix:
+  # 控制面不处理业务流量，node_listen 仅用于 /apisix/status 健康检查
+  node_listen: 9080
+  enable_ipv6: false
+
+  # ✅ 控制面开启 Admin API
+  enable_admin: true
+
+  admin_key:
+    - name: admin
+      key: ${{APISIX_ADMIN_KEY}}
+      role: admin
+    - name: viewer
+      key: ${{APISIX_VIEWER_KEY}}
+      role: viewer
+
+  admin_listen:
+    ip: 0.0.0.0
+    port: 9180
+
+  # Admin API 安全：仅允许内网访问（生产环境按实际网段调整）
+  allow_admin:
+    - 127.0.0.1
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+
+  ssl:
+    enable: false   # 控制面不处理 SSL 终止
+
+deployment:
+  role: traditional
+  role_traditional:
+    config_provider: etcd
+
+  etcd:
+    # 从环境变量读取，格式: "http://host1:2379,http://host2:2379"
+    # 脚本在启动前会将逗号分隔的字符串转换为 YAML 列表
+    host:
+      - ${{ETCD_HOSTS}}
+    prefix: ${{ETCD_PREFIX}}
+    timeout: 30
+    # 生产 etcd 开启 TLS 时取消注释：
+    # tls:
+    #   cert: /usr/local/apisix/certs/etcd-client.crt
+    #   key:  /usr/local/apisix/certs/etcd-client.key
+    #   verify: true
+
+nginx_config:
+  worker_processes: 2
+  worker_rlimit_nofile: 8192
+
+  http:
+    enable_access_log: true
+    access_log: /usr/local/apisix/logs/access.log
+    error_log: /usr/local/apisix/logs/error.log
+    error_log_level: warn
+
+# 插件列表：控制面需要知道所有插件（用于配置验证）
+# 数据面只需要实际执行的插件
+plugins:
+  # 认证
+  - key-auth
+  - jwt-auth
+  - hmac-auth
+  - basic-auth
+  - oauth2
+  # 流量控制
+  - limit-req
+  - limit-conn
+  - limit-count
+  - traffic-split
+  # 安全
+  - ip-restriction
+  - ua-restriction
+  - cors
+  - csrf
+  - uri-blocker
+  # 代理
+  - proxy-rewrite
+  - response-rewrite
+  - proxy-cache
+  - proxy-mirror
+  - grpc-transcode
+  # 可观测性
+  - prometheus
+  - opentelemetry
+  - zipkin
+  - skywalking
+  - http-logger
+  - kafka-logger
+  - syslog
+  # 自定义插件（plugins/ 目录）
+  - custom/my-auth-validator
+  - custom/request-id-enhancer
+
+plugin_attr:
+  prometheus:
+    export_uri: /apisix/prometheus/metrics
+    export_addr:
+      ip: 0.0.0.0
+      port: 9191
+
+  opentelemetry:
+    resource:
+      service.name: apisix-control-plane
+      service.version: "3.16.0"
+    collector:
+      address: "127.0.0.1:4318"  # 开发时无 otel，生产通过 env 覆盖
+      request_timeout: 3

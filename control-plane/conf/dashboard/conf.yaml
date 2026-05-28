@@ -1,0 +1,26 @@
+conf:
+  listen:
+    host: 0.0.0.0
+    port: 9000
+
+  etcd:
+    endpoints:
+      - "apisix-dev-etcd:2379"   # 开发默认值；生产通过容器环境变量覆盖
+    # mtls:
+    #   key_file:  /certs/etcd-client.key
+    #   cert_file: /certs/etcd-client.crt
+    #   ca_file:   /certs/ca.crt
+
+  log:
+    error_log:
+      level: warn
+      file_path: /usr/local/apisix-dashboard/logs/error.log
+    access_log:
+      file_path: /usr/local/apisix-dashboard/logs/access.log
+
+authentication:
+  secret: changeme-replace-via-env   # 通过 DASHBOARD_SECRET 环境变量覆盖
+  expire_time: 3600
+  users:
+    - username: admin
+      password: changeme-replace-via-env   # 通过 DASHBOARD_ADMIN_PASSWORD 覆盖

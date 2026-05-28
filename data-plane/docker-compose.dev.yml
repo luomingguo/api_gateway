@@ -1,0 +1,14 @@
+# 开发覆盖层：连接 dev/ 中的本地 etcd
+
+services:
+  apisix-dp:
+    environment:
+      CP_ETCD_HOSTS: "http://apisix-dev-etcd:2379"
+    networks:
+      - dp-net
+      - dev-net
+
+networks:
+  dev-net:
+    name: apisix-dev-net
+    external: true

@@ -1,0 +1,12 @@
+# ============================================================
+# 服务声明（Service = 上游 + 公共插件，路由可复用）
+# ============================================================
+
+services:
+  - id: "svc-user-service"
+    name: "用户服务（含通用插件）"
+    upstream_id: "upstream-user-service"
+    plugins:
+      prometheus: {}
+      request-id-enhancer:
+        include_in_response: true

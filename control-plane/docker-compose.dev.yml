@@ -1,0 +1,17 @@
+# 开发覆盖层：覆盖生产配置，连接 dev/ 中的本地 etcd
+# 使用方式：docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+services:
+  apisix-cp:
+    environment:
+      # 覆盖为本地 dev etcd
+      ETCD_HOSTS: "http://apisix-dev-etcd:2379"
+    networks:
+      - cp-net
+      - dev-net   # 加入 dev 网络以访问本地 etcd
+
+networks:
+  # 引用 dev/ 中已创建的网络（external: true）
+  dev-net:
+    name: apisix-dev-net
+    external: true

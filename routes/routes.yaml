@@ -1,0 +1,53 @@
+# ============================================================
+# 路由声明文件
+# 通过 scripts/sync-routes.sh 同步到 APISIX Admin API
+# ============================================================
+
+routes:
+  # ── 示例：用户服务 ──────────────────────────────────────
+  - id: "route-user-service-v1"
+    name: "用户服务 v1"
+    uri: "/api/v1/users*"
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    service_id: "svc-user-service"
+    plugins:
+      my-auth-validator:
+        app_id: "app-web,app-mobile"
+        header_name: "X-App-ID"
+      request-id-enhancer:
+        include_in_response: true
+      limit-count:
+        count: 1000
+        time_window: 60
+        rejected_code: 429
+      cors:
+        allow_origins: "https://example.com"
+        allow_methods: "GET,POST,PUT,DELETE"
+        allow_headers: "Authorization,Content-Type,X-App-ID,X-Request-ID"
+        max_age: 3600
+
+  # ── 示例：公开 API（无鉴权）────────────────────────────
+  - id: "route-public-health"
+    name: "健康检查（公开）"
+    uri: "/health"
+    methods: ["GET"]
+    upstream_id: "upstream-backend"
+    plugins:
+      limit-req:
+        rate: 100
+        burst: 50
+        rejected_code: 429
+
+  # ── 示例：内部 API（IP 限制）────────────────────────────
+  - id: "route-internal-admin"
+    name: "内部管理接口"
+    uri: "/internal/*"
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    upstream_id: "upstream-backend"
+    plugins:
+      ip-restriction:
+        whitelist:
+          - "10.0.0.0/8"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"
+      key-auth: {}

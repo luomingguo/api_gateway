@@ -1,0 +1,54 @@
+name: apisix-data-plane
+
+services:
+  apisix-dp:
+    image: apache/apisix:${APISIX_VERSION:-3.16.0-debian}
+    container_name: apisix-dp
+    restart: unless-stopped
+    volumes:
+      - ./conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ../plugins:/usr/local/apisix/plugins/custom:ro   # 自定义插件（只读）
+      - ../certs:/usr/local/apisix/certs:ro
+      - dp_logs:/usr/local/apisix/logs
+    ports:
+      - "${DP_HTTP_PORT:-9080}:9080"     # HTTP 流量入口
+      - "${DP_HTTPS_PORT:-9443}:9443"    # HTTPS 流量入口
+      # 9180 不暴露 —— 数据面无 Admin API
+      - "${DP_METRICS_PORT:-9192}:9192"  # Prometheus metrics（内网抓取）
+    environment:
+      APISIX_ADMIN_KEY: ${APISIX_ADMIN_KEY}   # 数据面不用，但启动脚本可能用到
+      CP_ETCD_HOSTS: ${CP_ETCD_HOSTS:-${ETCD_HOSTS}}
+      ETCD_PREFIX: ${ETCD_PREFIX:-/apisix}
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9080/apisix/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - dp-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200m"
+        max-file: "10"
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 2G
+        reservations:
+          cpus: "1"
+          memory: 512M
+
+networks:
+  dp-net:
+    name: apisix-dp-net
+    driver: bridge
+
+volumes:
+  dp_logs:

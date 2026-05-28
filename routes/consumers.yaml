@@ -1,0 +1,14 @@
+# ============================================================
+# 消费者声明（Consumer = API 调用方 + 认证凭据）
+# ============================================================
+
+consumers:
+  - username: "app-web"
+    plugins:
+      key-auth:
+        key: "web-client-api-key-replace-me"
+
+  - username: "app-mobile"
+    plugins:
+      key-auth:
+        key: "mobile-client-api-key-replace-me"

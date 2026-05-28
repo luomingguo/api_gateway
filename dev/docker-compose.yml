@@ -1,0 +1,75 @@
+name: apisix-dev-infra
+
+# 本地开发基础设施
+# 生产环境不使用此文件，生产的 etcd / Prometheus / Grafana 为独立部署
+
+services:
+  # ── 单节点 etcd（仅用于开发/测试）──────────────────────────
+  apisix-dev-etcd:
+    image: bitnami/etcd:${ETCD_VERSION:-3.5.16}
+    container_name: apisix-dev-etcd
+    restart: unless-stopped
+    environment:
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_ADVERTISE_CLIENT_URLS: http://apisix-dev-etcd:2379
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_DATA_DIR: /bitnami/etcd/data
+      # 生产应开启认证：ETCD_ROOT_PASSWORD: xxx
+    volumes:
+      - etcd_data:/bitnami/etcd
+    ports:
+      - "2379:2379"   # 暴露给宿主机，方便本地工具（etcdctl、dashboard）访问
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=http://localhost:2379", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev-net
+
+  # ── Prometheus（抓取 APISIX metrics）────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: apisix-dev-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    networks:
+      - dev-net
+
+  # ── Grafana ───────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: apisix-dev-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - dev-net
+
+networks:
+  dev-net:
+    name: apisix-dev-net
+    driver: bridge
+
+volumes:
+  etcd_data:
+  prometheus_data:
+  grafana_data:

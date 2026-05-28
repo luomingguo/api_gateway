@@ -1,0 +1,71 @@
+name: apisix-control-plane
+
+# 生产模式：etcd / Prometheus / Grafana 均为外部服务，通过环境变量配置
+# 开发模式：使用 docker-compose.dev.yml 覆盖层，连接 dev/ 中的本地基础设施
+
+services:
+  # ── 控制面 APISIX ─────────────────────────────────────────
+  # 仅提供 Admin API，不对外处理业务流量
+  apisix-cp:
+    image: apache/apisix:${APISIX_VERSION:-3.16.0-debian}
+    container_name: apisix-cp
+    restart: unless-stopped
+    volumes:
+      - ./conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ../plugins:/usr/local/apisix/plugins/custom:ro   # 自定义插件目录
+      - cp_logs:/usr/local/apisix/logs
+    ports:
+      - "${CP_ADMIN_PORT:-9180}:9180"    # Admin API（生产：只对内网暴露）
+      - "${CP_METRICS_PORT:-9191}:9191"  # Prometheus metrics
+    environment:
+      # 将 .env 中的变量注入到容器，供 config.yaml 的 ${{VAR}} 占位符使用
+      APISIX_ADMIN_KEY: ${APISIX_ADMIN_KEY}
+      APISIX_VIEWER_KEY: ${APISIX_VIEWER_KEY}
+      ETCD_HOSTS: ${ETCD_HOSTS}
+      ETCD_PREFIX: ${ETCD_PREFIX:-/apisix}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9180/apisix/admin/routes",
+             "-H", "X-API-KEY: ${APISIX_ADMIN_KEY}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - cp-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # ── Dashboard ─────────────────────────────────────────────
+  apisix-dashboard:
+    image: apache/apisix-dashboard:${DASHBOARD_VERSION:-3.0.1}
+    container_name: apisix-dashboard
+    restart: unless-stopped
+    volumes:
+      - ./conf/dashboard/conf.yaml:/usr/local/apisix-dashboard/conf/conf.yaml:ro
+    ports:
+      - "${DASHBOARD_PORT:-9000}:9000"   # 生产：建议放在 VPN / 内网后
+    environment:
+      ETCD_HOSTS: ${ETCD_HOSTS}
+      DASHBOARD_SECRET: ${DASHBOARD_SECRET}
+      DASHBOARD_ADMIN_PASSWORD: ${DASHBOARD_ADMIN_PASSWORD}
+    depends_on:
+      apisix-cp:
+        condition: service_healthy
+    networks:
+      - cp-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+networks:
+  cp-net:
+    name: apisix-cp-net
+    driver: bridge
+
+volumes:
+  cp_logs:
