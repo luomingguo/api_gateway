@@ -1,8 +1,0 @@
-FROM apache/apisix:3.9.0-debian
-
-# 复制自定义插件到 APISIX 插件目录
-COPY apisix/plugins/ /usr/local/apisix/apisix/plugins/
-
-# 复制配置文件（Standalone 模式）
-COPY apisix/config.yaml /usr/local/apisix/conf/config.yaml
-COPY apisix/apisix.yaml /usr/local/apisix/conf/apisix.yaml

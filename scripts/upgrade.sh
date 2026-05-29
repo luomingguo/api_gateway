@@ -13,6 +13,23 @@ source "$ROOT_DIR/.env" 2>/dev/null || true
 
 NEW_VERSION="${1:?"用法: upgrade.sh <version>，例如: upgrade.sh 3.16.0"}"
 CURRENT_VERSION="${APISIX_VERSION:-unknown}"
+
+get_distro_suffix() {
+    if [ -r /etc/lsb-release ]; then
+        # shellcheck disable=SC1091
+        . /etc/lsb-release
+        echo "${DISTRIB_ID:-debian}" | tr '[:upper:]' '[:lower:]'
+    elif [ -r /etc/os-release ]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        echo "${ID:-debian}" | tr '[:upper:]' '[:lower:]'
+    else
+        echo "debian"
+    fi
+}
+
+DISTRO_SUFFIX="$(get_distro_suffix)"
+TARGET_VERSION="${NEW_VERSION}-${DISTRO_SUFFIX}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="$ROOT_DIR/backups/$TIMESTAMP"
 
@@ -22,7 +39,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 echo ""
-echo -e "${GREEN}🔄 APISIX 升级：$CURRENT_VERSION → $NEW_VERSION${NC}"
+echo -e "${GREEN}🔄 APISIX 升级：$CURRENT_VERSION → $TARGET_VERSION${NC}"
 echo ""
 
 # ── Step 1: 备份 ─────────────────────────────────────────────
@@ -40,17 +57,17 @@ bash "$SCRIPT_DIR/backup.sh" "$BACKUP_DIR/etcd-routes.json" 2>/dev/null \
 
 # ── Step 2: 拉取新镜像 ───────────────────────────────────────
 echo -e "${YELLOW}[2/5] 拉取新版本镜像...${NC}"
-docker pull "apache/apisix:${NEW_VERSION}-debian"
+docker pull "apache/apisix:${TARGET_VERSION}"
 echo -e "  ${GREEN}✅ 镜像拉取完成${NC}"
 
 # ── Step 3: 更新版本号 ───────────────────────────────────────
 echo -e "${YELLOW}[3/5] 更新 .env 版本号...${NC}"
 if grep -q "^APISIX_VERSION=" "$ROOT_DIR/.env" 2>/dev/null; then
-    sed -i.bak "s/^APISIX_VERSION=.*/APISIX_VERSION=${NEW_VERSION}-debian/" "$ROOT_DIR/.env"
+    sed -i.bak "s/^APISIX_VERSION=.*/APISIX_VERSION=${TARGET_VERSION}/" "$ROOT_DIR/.env"
 else
-    echo "APISIX_VERSION=${NEW_VERSION}-debian" >> "$ROOT_DIR/.env"
+    echo "APISIX_VERSION=${TARGET_VERSION}" >> "$ROOT_DIR/.env"
 fi
-echo -e "  ${GREEN}✅ APISIX_VERSION=${NEW_VERSION}-debian${NC}"
+echo -e "  ${GREEN}✅ APISIX_VERSION=${TARGET_VERSION}${NC}"
 
 # ── Step 4: 滚动升级（先升控制面，再升数据面）───────────────
 echo -e "${YELLOW}[4/5] 滚动升级服务...${NC}"

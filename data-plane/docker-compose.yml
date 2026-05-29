@@ -2,7 +2,7 @@ name: apisix-data-plane
 
 services:
   apisix-dp:
-    image: apache/apisix:${APISIX_VERSION:-3.16.0-debian}
+    image: apache/apisix:${APISIX_VERSION}
     container_name: apisix-dp
     restart: unless-stopped
     volumes:

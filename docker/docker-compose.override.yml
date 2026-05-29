@@ -1,7 +1,0 @@
-services:
-  apisix:
-    image: apache/apisix:3.9.0-debian   # 用官方镜像
-    volumes:
-      - ./apisix/plugins:/usr/local/apisix/apisix/plugins:ro   # 热挂载
-      - ./apisix/config.yaml:/usr/local/apisix/conf/config.yaml:ro
-      - ./apisix/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro

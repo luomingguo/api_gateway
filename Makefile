@@ -17,8 +17,30 @@ SHELL := /bin/bash
 ENV   ?= dev
 
 # 加载 .env（如存在）
+ifeq ($(wildcard .env),)
+    ifneq ($(wildcard .env.example),)
+        $(shell cp .env.example .env)
+    endif
+endif
+
+# 2. 引入 .env 变量
 -include .env
+ifndef APISIX_VERSION
+    APISIX_DISTRO := $(shell \
+        if [ -r /etc/lsb-release ]; then \
+            . /etc/lsb-release; \
+            echo "$${DISTRIB_ID:-debian}" | tr '[:upper:]' '[:lower:]'; \
+        elif [ -r /etc/os-release ]; then \
+            . /etc/os-release; \
+            echo "$${ID:-debian}" | tr '[:upper:]' '[:lower:]'; \
+        else \
+            echo "debian"; \
+        fi)
+    APISIX_VERSION := 3.16.0-$(APISIX_DISTRO)
+endif
+export APISIX_VERSION
 export
+
 
 # Docker Compose 文件
 CP_COMPOSE  = control-plane/docker-compose.yml

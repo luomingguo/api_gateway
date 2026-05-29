@@ -7,7 +7,7 @@ services:
   # ── 控制面 APISIX ─────────────────────────────────────────
   # 仅提供 Admin API，不对外处理业务流量
   apisix-cp:
-    image: apache/apisix:${APISIX_VERSION:-3.16.0-debian}
+    image: apache/apisix:${APISIX_VERSION}
     container_name: apisix-cp
     restart: unless-stopped
     volumes:
@@ -40,7 +40,7 @@ services:
 
   # ── Dashboard ─────────────────────────────────────────────
   apisix-dashboard:
-    image: apache/apisix-dashboard:${DASHBOARD_VERSION:-3.0.1}
+    image: apache/apisix-dashboard:${DASHBOARD_VERSION:-latest}
     container_name: apisix-dashboard
     restart: unless-stopped
     volumes:

@@ -29,7 +29,16 @@ export TEST_ADMIN_KEY="test-admin-key-for-testing-only"
 export TEST_HTTP_PORT="19080"
 export TEST_ADMIN_PORT="19180"
 export TEST_ETCD_PORT="12379"
-export APISIX_VERSION="${APISIX_VERSION:-3.16.0-debian}"
+
+if [ -z "${APISIX_VERSION:-}" ]; then
+    distro_suffix="debian"
+    if [ -r /etc/lsb-release ]; then
+        # shellcheck disable=SC1091
+        . /etc/lsb-release
+        distro_suffix="$(echo "${DISTRIB_ID:-debian}" | tr '[:upper:]' '[:lower:]')"
+    fi
+    export APISIX_VERSION="3.16.0-${distro_suffix}"
+fi
 
 ADMIN_URL="http://localhost:$TEST_ADMIN_PORT"
 GW_URL="http://localhost:$TEST_HTTP_PORT"
